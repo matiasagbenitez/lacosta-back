@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
+import { getCookieConfig } from '../utils/cookieConfig';
 
 /**
  * Endpoint para verificar el código de acceso
@@ -50,12 +51,21 @@ export const verifyAccessCode = async (req: Request, res: Response): Promise<voi
       // Usamos el código de acceso hasheado como token de sesión
       const sessionToken = access_code;
       
-      res.cookie('auth_session', sessionToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 24 * 60 * 60 * 1000 // 24 horas
-      });
+      // Obtener configuración de cookies según el entorno
+      const cookieConfig = getCookieConfig();
+      
+      // Log para debugging (solo en desarrollo)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🍪 Configuración de cookie:', cookieConfig);
+        console.log('🌐 Frontend URL:', process.env.FRONTEND_URL);
+        console.log('🌐 Backend URL:', process.env.BACKEND_URL);
+      }
+      
+      res.cookie('auth_session', sessionToken, cookieConfig);
+      
+      // Asegurar que los headers de CORS estén presentes
+      res.header('Access-Control-Allow-Credentials', 'true');
+      res.header('Access-Control-Allow-Origin', process.env.FRONTEND_URL || 'http://localhost:3000');
 
       res.json({
         success: true,
@@ -77,7 +87,10 @@ export const verifyAccessCode = async (req: Request, res: Response): Promise<voi
  */
 export const logout = async (req: Request, res: Response): Promise<void> => {
   try {
-    res.clearCookie('auth_session');
+    // Obtener configuración de cookies según el entorno
+    const cookieConfig = getCookieConfig();
+    
+    res.clearCookie('auth_session', cookieConfig);
     res.json({
       success: true,
       message: 'Sesión cerrada exitosamente'
@@ -97,10 +110,24 @@ export const logout = async (req: Request, res: Response): Promise<void> => {
  */
 export const checkAuth = async (req: Request, res: Response): Promise<void> => {
   try {
+    // Asegurar headers CORS
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Origin', process.env.FRONTEND_URL || 'http://localhost:3000');
+    
     const sessionToken = req.cookies?.auth_session;
     const accessCodeHash = process.env.ACCESS_CODE_HASH;
+    
+    // Log para debugging (también en producción para troubleshooting)
+    console.log('🔍 CheckAuth - Cookies recibidas:', Object.keys(req.cookies || {}));
+    console.log('🔍 CheckAuth - SessionToken:', sessionToken ? 'presente' : 'ausente');
+    console.log('🔍 CheckAuth - Request origin:', req.headers.origin);
+    console.log('🔍 CheckAuth - Request headers:', {
+      cookie: req.headers.cookie ? 'presente' : 'ausente',
+      'user-agent': req.headers['user-agent']
+    });
 
     if (!sessionToken || !accessCodeHash) {
+      console.log('❌ CheckAuth fallido: sin token o hash');
       res.json({
         success: false,
         authenticated: false
@@ -109,7 +136,17 @@ export const checkAuth = async (req: Request, res: Response): Promise<void> => {
     }
 
     bcrypt.compare(sessionToken, accessCodeHash, (err, isMatch) => {
-      if (err || !isMatch) {
+      if (err) {
+        console.error('Error al comparar token:', err);
+        res.json({
+          success: false,
+          authenticated: false
+        });
+        return;
+      }
+      
+      if (!isMatch) {
+        console.log('❌ CheckAuth fallido: token no coincide');
         res.json({
           success: false,
           authenticated: false
@@ -117,6 +154,8 @@ export const checkAuth = async (req: Request, res: Response): Promise<void> => {
         return;
       }
 
+      console.log('✅ CheckAuth exitoso: usuario autenticado');
+      
       res.json({
         success: true,
         authenticated: true
