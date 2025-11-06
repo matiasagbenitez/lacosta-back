@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: products-backend
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+
