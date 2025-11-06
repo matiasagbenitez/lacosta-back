@@ -54,22 +54,28 @@ export const verifyAccessCode = async (req: Request, res: Response): Promise<voi
       // Obtener configuración de cookies según el entorno
       const cookieConfig = getCookieConfig();
       
+      // Asegurar que los headers de CORS estén presentes ANTES de establecer la cookie
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      res.header('Access-Control-Allow-Credentials', 'true');
+      res.header('Access-Control-Allow-Origin', frontendUrl);
+      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      
       // Log para debugging (solo en desarrollo)
       if (process.env.NODE_ENV === 'development') {
         console.log('🍪 Configuración de cookie:', cookieConfig);
-        console.log('🌐 Frontend URL:', process.env.FRONTEND_URL);
+        console.log('🌐 Frontend URL:', frontendUrl);
         console.log('🌐 Backend URL:', process.env.BACKEND_URL);
       }
       
+      // Establecer la cookie
       res.cookie('auth_session', sessionToken, cookieConfig);
-      
-      // Asegurar que los headers de CORS estén presentes
-      res.header('Access-Control-Allow-Credentials', 'true');
-      res.header('Access-Control-Allow-Origin', process.env.FRONTEND_URL || 'http://localhost:3000');
 
-      res.json({
+      // Enviar respuesta JSON con status 200
+      res.status(200).json({
         success: true,
-        message: 'Autenticación exitosa'
+        message: 'Autenticación exitosa',
+        authenticated: true
       });
     });
   } catch (error) {
@@ -110,9 +116,12 @@ export const logout = async (req: Request, res: Response): Promise<void> => {
  */
 export const checkAuth = async (req: Request, res: Response): Promise<void> => {
   try {
-    // Asegurar headers CORS
+    // Asegurar headers CORS ANTES de cualquier otra operación
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
     res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Origin', process.env.FRONTEND_URL || 'http://localhost:3000');
+    res.header('Access-Control-Allow-Origin', frontendUrl);
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     
     const sessionToken = req.cookies?.auth_session;
     const accessCodeHash = process.env.ACCESS_CODE_HASH;
@@ -128,7 +137,7 @@ export const checkAuth = async (req: Request, res: Response): Promise<void> => {
 
     if (!sessionToken || !accessCodeHash) {
       console.log('❌ CheckAuth fallido: sin token o hash');
-      res.json({
+      res.status(200).json({
         success: false,
         authenticated: false
       });
@@ -138,7 +147,7 @@ export const checkAuth = async (req: Request, res: Response): Promise<void> => {
     bcrypt.compare(sessionToken, accessCodeHash, (err, isMatch) => {
       if (err) {
         console.error('Error al comparar token:', err);
-        res.json({
+        res.status(200).json({
           success: false,
           authenticated: false
         });
@@ -147,7 +156,7 @@ export const checkAuth = async (req: Request, res: Response): Promise<void> => {
       
       if (!isMatch) {
         console.log('❌ CheckAuth fallido: token no coincide');
-        res.json({
+        res.status(200).json({
           success: false,
           authenticated: false
         });
@@ -156,14 +165,14 @@ export const checkAuth = async (req: Request, res: Response): Promise<void> => {
 
       console.log('✅ CheckAuth exitoso: usuario autenticado');
       
-      res.json({
+      res.status(200).json({
         success: true,
         authenticated: true
       });
     });
   } catch (error) {
     console.error('Error en checkAuth:', error);
-    res.json({
+    res.status(200).json({
       success: false,
       authenticated: false
     });
