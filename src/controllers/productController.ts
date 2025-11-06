@@ -6,7 +6,7 @@ import { getPresignedImageUrl } from '../services/s3Service';
 // Obtener todos los productos
 export const getAllProducts = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { brand, category, search, page, limit } = req.query;
+    const { brand, category, search, available, page, limit } = req.query;
     
     // Construir filtros dinámicos
     const whereClause: any = {};
@@ -17,6 +17,12 @@ export const getAllProducts = async (req: Request, res: Response): Promise<void>
     
     if (category && category !== 'all') {
       whereClause.category = category;
+    }
+    
+    if (available !== undefined && available !== 'all') {
+      // Convertir string 'true'/'false' a boolean
+      const availableValue = typeof available === 'string' ? available : String(available);
+      whereClause.available = availableValue === 'true';
     }
     
     if (search) {
