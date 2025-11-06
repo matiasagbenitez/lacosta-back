@@ -27,9 +27,10 @@ export const getAllProducts = async (req: Request, res: Response): Promise<void>
     
     if (search) {
       whereClause[Op.or] = [
-        { name: { [Op.like]: `%${search}%` } },
-        { ean: { [Op.like]: `%${search}%` } },
-        { description: { [Op.like]: `%${search}%` } }
+        { name: { [Op.iLike]: `%${search}%` } },
+        { original_name: { [Op.iLike]: `%${search}%` } },
+        { brand: { [Op.iLike]: `%${search}%` } },
+        { ean: { [Op.iLike]: `%${search}%` } },
       ];
     }
 
