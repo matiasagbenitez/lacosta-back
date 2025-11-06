@@ -68,6 +68,40 @@ async function initializeDatabase() {
     await sequelize.authenticate();
     console.log('✅ Conexión a la base de datos establecida correctamente.');
     
+    // Verificar y convertir la columna 'available' de INTEGER a BOOLEAN si es necesario
+    try {
+      const [results] = await sequelize.query(`
+        SELECT data_type 
+        FROM information_schema.columns 
+        WHERE table_name = 'products' AND column_name = 'available'
+      `) as any[];
+      
+      if (results && results.length > 0 && results[0].data_type === 'integer') {
+        console.log('🔄 Convirtiendo columna "available" de INTEGER a BOOLEAN...');
+        
+        // Convertir INTEGER a BOOLEAN: 0 -> false, cualquier otro valor -> true
+        await sequelize.query(`
+          ALTER TABLE "products" 
+          ALTER COLUMN "available" TYPE BOOLEAN 
+          USING CASE WHEN "available" = 0 THEN false ELSE true END;
+        `);
+        
+        // Establecer NOT NULL y DEFAULT después de la conversión
+        await sequelize.query(`
+          ALTER TABLE "products" 
+          ALTER COLUMN "available" SET NOT NULL,
+          ALTER COLUMN "available" SET DEFAULT true;
+        `);
+        
+        console.log('✅ Columna "available" convertida correctamente.');
+      }
+    } catch (migrationError: any) {
+      // Si la tabla no existe o la columna no existe, continuar con la sincronización normal
+      if (migrationError.message && !migrationError.message.includes('does not exist')) {
+        console.warn('⚠️ Advertencia al verificar columna "available":', migrationError.message);
+      }
+    }
+    
     // Sincronizar modelos (crear tablas si no existen)
     await sequelize.sync({ alter: true });
     console.log('✅ Modelos sincronizados con la base de datos.');
